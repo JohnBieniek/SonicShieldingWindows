@@ -9,5 +9,5 @@ static class Program
         if (!first) return;
         ApplicationConfiguration.Initialize();
         Application.Run(new TrayApplicationContext());
-    }    
+    }
 }
