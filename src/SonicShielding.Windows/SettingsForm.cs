@@ -5,7 +5,12 @@ namespace SonicShielding.Windows;
 
 internal sealed class SettingsForm : Form
 {
-    private static readonly (string Name, int Frequency)[] EqualizerBands = { ("Bass", 80), ("Warmth", 200), ("Body", 500), ("Presence", 1000), ("Clarity", 2500), ("Detail", 6000), ("Air", 12000) };
+    private static readonly (string Range, int Frequency)[] EqualizerBands =
+    {
+        ("45–90 Hz", 63), ("90–180 Hz", 125), ("180–355 Hz", 250),
+        ("355–710 Hz", 500), ("710 Hz–1.4 kHz", 1000), ("1.4–2.8 kHz", 2000),
+        ("2.8–5.7 kHz", 4000), ("5.7–9.8 kHz", 8000), ("9.8–16 kHz", 12000)
+    };
     private readonly ShieldSettings settings;
     private readonly Action save;
     private readonly Button stateButton;
@@ -43,14 +48,14 @@ internal sealed class SettingsForm : Form
         beep.Controls.Add(Slider("Sudden sound reduction", settings.SuddenSoundReduction, 0, 90, v => settings.SuddenSoundReduction = v));
         content.Controls.Add(Card(beep));
 
-        var eq = Stack("Comfort equalizer", "Preview each range and shape a comfortable listening profile. Tone tests play briefly at a gentle level.");
+        var eq = Stack("Optional comfort EQ", "These reductions stay active continuously when enabled. The suggested settings heavily soften upper frequencies to cover many piercing, high-pitched sounds. The EQ starts off because permanent filtering can also muffle speech and music.");
+        eq.Controls.Add(Check("Enable permanent comfort EQ", settings.ComfortEqEnabled, v => settings.ComfortEqEnabled = v));
         for (var i = 0; i < EqualizerBands.Length; i++) eq.Controls.Add(EqualizerBand(i));
         content.Controls.Add(Card(eq));
         content.Controls.Add(Card(Label("How Windows protection works", 16, true), Label("This version safely analyzes the system-wide WASAPI mix and briefly lowers the active output endpoint only when a qualifying tone or spike is detected. It does not record, upload, or save audio. Equalizer controls are a saved comfort profile and tone-preview tool; applying frequency-only EQ across Windows requires a signed audio-effect driver.", 10)));
         content.Controls.Add(Card(Check("Start Sonic Shielding with Windows", settings.StartWithWindows, v => settings.StartWithWindows = v)));
         var saveButton = Button("Save comfort profile"); saveButton.Click += (_, _) => { save(); saveButton.Text = "Saved"; }; content.Controls.Add(saveButton);
-        content.Controls.Add(Label("Everything stays on your device.", 10, true, Color.FromArgb(167, 194, 209)));
-        content.Controls.Add(WhimsyLogo());
+        content.Controls.Add(Footer());
 
         viewport.Resize += (_, _) => LayoutContent(); Shown += (_, _) => LayoutContent();
         FormClosing += (_, e) => { if (e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); } };
@@ -70,7 +75,7 @@ internal sealed class SettingsForm : Form
     {
         foreach (Control child in parent.Controls)
         {
-            if (child is PictureBox picture) { picture.Width = Math.Min(300, width); continue; }
+            if (child is PictureBox picture) { picture.Width = width; continue; }
             child.Width = width;
             if (child is Label label)
                 label.Height = TextRenderer.MeasureText(label.Text, label.Font, new Size(Math.Max(100, width - 8), 0), TextFormatFlags.WordBreak).Height + 10;
@@ -82,10 +87,14 @@ internal sealed class SettingsForm : Form
     {
         var band = EqualizerBands[index];
         var row = new TableLayoutPanel { Height = 62, ColumnCount = 3, Margin = new(4, 3, 4, 3) };
-        row.ColumnStyles.Add(new(SizeType.Percent, 28)); row.ColumnStyles.Add(new(SizeType.Percent, 52)); row.ColumnStyles.Add(new(SizeType.Percent, 20));
-        row.Controls.Add(Label($"{band.Name}\n{FormatFrequency(band.Frequency)}", 9, true), 0, 0);
-        var slider = new TrackBar { Minimum = -12, Maximum = 12, Value = Math.Clamp(settings.EqualizerLevels[index], -12, 12), TickFrequency = 3, Dock = DockStyle.Fill };
-        slider.ValueChanged += (_, _) => settings.EqualizerLevels[index] = slider.Value; row.Controls.Add(slider, 1, 0);
+        row.ColumnStyles.Add(new(SizeType.Percent, 30)); row.ColumnStyles.Add(new(SizeType.Percent, 50)); row.ColumnStyles.Add(new(SizeType.Percent, 20));
+        row.Controls.Add(Label(band.Range, 9, true), 0, 0);
+        var sliderPanel = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2 };
+        sliderPanel.RowStyles.Add(new(SizeType.Percent, 65)); sliderPanel.RowStyles.Add(new(SizeType.Percent, 35));
+        var slider = new TrackBar { Minimum = 0, Maximum = 100, Value = Math.Clamp(settings.ComfortEqReductions[index], 0, 100), TickStyle = TickStyle.None, Dock = DockStyle.Fill };
+        var output = Label($"{slider.Value}% reduced", 8, false, Color.FromArgb(167, 194, 209)); output.TextAlign = ContentAlignment.MiddleCenter;
+        slider.ValueChanged += (_, _) => { settings.ComfortEqReductions[index] = slider.Value; output.Text = $"{slider.Value}% reduced"; };
+        sliderPanel.Controls.Add(slider, 0, 0); sliderPanel.Controls.Add(output, 0, 1); row.Controls.Add(sliderPanel, 1, 0);
         var test = Button("Test tone"); test.Height = 36; test.Dock = DockStyle.Top; test.Click += async (_, _) => await PlayToneAsync(band.Frequency, test); row.Controls.Add(test, 2, 0);
         return row;
     }
@@ -103,15 +112,24 @@ internal sealed class SettingsForm : Form
         finally { button.Enabled = true; button.Text = "Test tone"; }
     }
 
+    private Control Footer()
+    {
+        var footer = new TableLayoutPanel { ColumnCount = 1, RowCount = 3, Height = 190, Margin = new(4, 18, 4, 4) };
+        footer.RowStyles.Add(new(SizeType.Absolute, 34)); footer.RowStyles.Add(new(SizeType.Absolute, 30)); footer.RowStyles.Add(new(SizeType.Percent, 100));
+        var privacy = Label("Everything stays on your device.", 10, true, Color.FromArgb(167, 194, 209)); privacy.Dock = DockStyle.Fill; privacy.TextAlign = ContentAlignment.MiddleCenter;
+        var partnership = Label("Created in partnership with", 9, false, Color.FromArgb(167, 194, 209)); partnership.Dock = DockStyle.Fill; partnership.TextAlign = ContentAlignment.MiddleCenter;
+        var logo = WhimsyLogo(); logo.Dock = DockStyle.Fill;
+        footer.Controls.Add(privacy, 0, 0); footer.Controls.Add(partnership, 0, 1); footer.Controls.Add(logo, 0, 2);
+        return footer;
+    }
+
     private PictureBox WhimsyLogo()
     {
         var assembly = typeof(SettingsForm).Assembly;
         var name = assembly.GetManifestResourceNames().Single(n => n.EndsWith("whimsy-logo.png", StringComparison.OrdinalIgnoreCase));
         using var stream = assembly.GetManifestResourceStream(name)!; using var source = Image.FromStream(stream);
-        return new PictureBox { Image = new Bitmap(source), Height = 118, SizeMode = PictureBoxSizeMode.Zoom, Margin = new(4, 8, 4, 8) };
+        return new PictureBox { Image = new Bitmap(source), Height = 118, SizeMode = PictureBoxSizeMode.Zoom, Margin = new(4, 0, 4, 8) };
     }
-
-    private static string FormatFrequency(int frequency) => frequency >= 1000 ? $"{frequency / 1000d:0.#} kHz" : $"{frequency} Hz";
     private Label Label(string text, float size, bool bold = false, Color? color = null) { var font = new Font("Segoe UI", size, bold ? FontStyle.Bold : FontStyle.Regular); return new Label { Text = text, AutoSize = false, Height = TextRenderer.MeasureText(text, font, new Size(780, 0), TextFormatFlags.WordBreak).Height + 10, ForeColor = color ?? ForeColor, Font = font, Margin = new(4, 5, 4, 8) }; }
     private Button Button(string text) => new() { Text = text, Height = 44, FlatStyle = FlatStyle.Flat, BackColor = mint, ForeColor = Color.FromArgb(5, 32, 43), Font = new("Segoe UI", 10, FontStyle.Bold), Margin = new(4, 8, 4, 8) };
     private Panel Card(params Control[] controls) { var p = Stack("", ""); p.BackColor = card; p.Padding = new(16); p.Margin = new(4, 10, 4, 10); foreach (var c in controls) p.Controls.Add(c); return p; }

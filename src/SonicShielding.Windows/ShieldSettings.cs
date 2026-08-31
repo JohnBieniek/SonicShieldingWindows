@@ -4,6 +4,10 @@ namespace SonicShielding.Windows;
 
 internal sealed class ShieldSettings
 {
+    private const int CurrentSettingsSchemaVersion = 2;
+    public static readonly int[] DefaultComfortEqReductions = [0, 0, 0, 0, 97, 98, 99, 100, 100];
+
+    public int SettingsSchemaVersion { get; set; } = CurrentSettingsSchemaVersion;
     public bool Enabled { get; set; } = true;
     public string ProtectionStrength { get; set; } = "Strong";
     public int Sensitivity { get; set; } = 95;
@@ -13,7 +17,8 @@ internal sealed class ShieldSettings
     public bool PreserveSpeech { get; set; } = true;
     public bool AggressiveAlarmBlocking { get; set; } = true;
     public int SuddenSoundReduction { get; set; } = 50;
-    public int[] EqualizerLevels { get; set; } = new int[7];
+    public bool ComfortEqEnabled { get; set; }
+    public int[] ComfortEqReductions { get; set; } = [.. DefaultComfortEqReductions];
     public bool StartWithWindows { get; set; }
 
     private static readonly string Folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SonicShielding");
@@ -27,7 +32,16 @@ internal sealed class ShieldSettings
             var loaded = JsonSerializer.Deserialize<ShieldSettings>(json) ?? new();
             using var document = JsonDocument.Parse(json);
             if (!document.RootElement.TryGetProperty(nameof(AggressiveAlarmBlocking), out _)) loaded.AggressiveAlarmBlocking = true;
-            if (loaded.EqualizerLevels is not { Length: 7 }) loaded.EqualizerLevels = new int[7];
+            if (!document.RootElement.TryGetProperty(nameof(SettingsSchemaVersion), out _) ||
+                loaded.SettingsSchemaVersion < CurrentSettingsSchemaVersion ||
+                !document.RootElement.TryGetProperty(nameof(ProtectionStrength), out _))
+            {
+                loaded.SettingsSchemaVersion = CurrentSettingsSchemaVersion;
+                loaded.ProtectionStrength = "Strong";
+                loaded.Sensitivity = 95;
+                loaded.MaximumReduction = 99;
+            }
+            if (loaded.ComfortEqReductions is not { Length: 9 }) loaded.ComfortEqReductions = [.. DefaultComfortEqReductions];
             return loaded;
         }
         catch { return new(); }
