@@ -1,6 +1,8 @@
 using NAudio.CoreAudioApi;
+using NAudio.CoreAudioApi.Interfaces;
 using NAudio.Dsp;
 using NAudio.Wave;
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 
 namespace SonicShielding.Windows;
@@ -13,6 +15,8 @@ internal sealed class SystemAudioShield : IDisposable
     private MMDevice? device;
     private readonly List<float> samples = new(4096);
     private System.Threading.Timer? restoreTimer;
+    private System.Threading.Timer? sessionMonitor;
+    private readonly ConcurrentDictionary<string, AudioSessionState> sessionStates = new();
     private float volumeBeforeDuck;
     private bool ducked;
     private double previousRms;
@@ -34,6 +38,8 @@ internal sealed class SystemAudioShield : IDisposable
             capture.DataAvailable += OnAudio;
             capture.RecordingStopped += (_, e) => { if (e.Exception != null) StatusChanged?.Invoke(e.Exception.Message); };
             capture.StartRecording();
+            SnapshotSessions(false);
+            sessionMonitor = new(_ => SnapshotSessions(true), null, 10, 10);
             StatusChanged?.Invoke($"Protecting all sound on {device.FriendlyName}");
         }
     }
@@ -43,6 +49,8 @@ internal sealed class SystemAudioShield : IDisposable
         lock (sync)
         {
             capture?.StopRecording(); capture?.Dispose(); capture = null;
+            sessionMonitor?.Dispose(); sessionMonitor = null;
+            sessionStates.Clear();
             RestoreVolume();
             samples.Clear();
             previousRms = 0;
@@ -51,9 +59,37 @@ internal sealed class SystemAudioShield : IDisposable
         }
     }
 
+    private void SnapshotSessions(bool protectNewPlayback)
+    {
+        try
+        {
+            if (device == null) return;
+            var sessions = device.AudioSessionManager.Sessions;
+            var seen = new HashSet<string>();
+            for (int i = 0; i < sessions.Count; i++)
+            {
+                using var session = sessions[i];
+                string id = session.GetSessionInstanceIdentifier;
+                var state = session.State;
+                seen.Add(id);
+                bool known = sessionStates.TryGetValue(id, out var previous);
+                bool started = state == AudioSessionState.AudioSessionStateActive &&
+                    (!known || previous != AudioSessionState.AudioSessionStateActive);
+                sessionStates[id] = state;
+                if (protectNewPlayback && settings.AggressiveAlarmBlocking && started)
+                    Duck(settings.MaximumReduction, Math.Max(350, settings.ReleaseMilliseconds));
+            }
+            foreach (var id in sessionStates.Keys.Where(id => !seen.Contains(id))) sessionStates.TryRemove(id, out _);
+        }
+        catch (ObjectDisposedException) { }
+        catch (InvalidOperationException) { }
+        catch (System.Runtime.InteropServices.COMException) { }
+    }
+
     private void OnAudio(object? sender, WaveInEventArgs e)
     {
         var format = capture!.WaveFormat;
+        var sampleFormat = format is WaveFormatExtensible extensible ? extensible.ToStandardWaveFormat() : format;
         int bytes = format.BitsPerSample / 8;
         int frame = bytes * format.Channels;
         for (int offset = 0; offset + frame <= e.BytesRecorded; offset += frame)
@@ -62,13 +98,25 @@ internal sealed class SystemAudioShield : IDisposable
             for (int channel = 0; channel < format.Channels; channel++)
             {
                 int index = offset + channel * bytes;
-                mono += format.Encoding == WaveFormatEncoding.IeeeFloat
-                    ? BitConverter.ToSingle(e.Buffer, index)
-                    : format.BitsPerSample == 16 ? BitConverter.ToInt16(e.Buffer, index) / 32768f : 0;
+                mono += ReadSample(e.Buffer, index, sampleFormat.Encoding, format.BitsPerSample);
             }
             samples.Add((float)(mono / format.Channels));
             if (samples.Count >= 512) { Analyze(CollectionsMarshal.AsSpan(samples)[..512], format.SampleRate); samples.RemoveRange(0, 128); }
         }
+    }
+
+    private static float ReadSample(byte[] buffer, int index, WaveFormatEncoding encoding, int bitsPerSample)
+    {
+        if (encoding == WaveFormatEncoding.IeeeFloat && bitsPerSample == 32)
+            return BitConverter.ToSingle(buffer, index);
+        if (encoding != WaveFormatEncoding.Pcm) return 0;
+        return bitsPerSample switch
+        {
+            16 => BitConverter.ToInt16(buffer, index) / 32768f,
+            24 => ((buffer[index] | buffer[index + 1] << 8 | buffer[index + 2] << 16) << 8 >> 8) / 8388608f,
+            32 => BitConverter.ToInt32(buffer, index) / 2147483648f,
+            _ => 0
+        };
     }
 
     private void Analyze(ReadOnlySpan<float> block, int sampleRate)
@@ -138,7 +186,7 @@ internal sealed class SystemAudioShield : IDisposable
         }
     }
 
-    public void Dispose() { Stop(); restoreTimer?.Dispose(); device?.Dispose(); }
+    public void Dispose() { Stop(); restoreTimer?.Dispose(); sessionMonitor?.Dispose(); device?.Dispose(); }
 }
 
 internal sealed class LowLatencyLoopbackCapture : WasapiCapture
