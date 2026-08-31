@@ -8,6 +8,7 @@ Sonic Shielding sits in the Windows notification area and watches the complete a
 - Detects prominent high-frequency tones and sudden sound spikes across browsers, media players, games, calls, and other applications using the default Windows output.
 - Briefly attenuates the system output when a qualifying sound is present, then restores the previous volume.
 - Preserves saved protection choices and can start with Windows.
+- Includes a seven-band comfort profile with a gentle tone-test button for every band.
 - Uses the original Sonic Shielding active and inactive icons and visual language.
 
 This safe user-mode build attenuates the complete mix while a detected sound is present. Selective frequency removal and always-on multiband EQ require a separately signed Windows Audio Processing Object (APO) driver. The app does not claim to provide those driver-only features.
@@ -16,7 +17,7 @@ This safe user-mode build attenuates the complete mix while a detected sound is 
 
 For most people, download `SonicShieldingWindows-Setup.exe` from Releases and follow the installer. It installs per-user, does not require administrator access, and can be removed from Windows Settings.
 
-For a portable copy, download `SonicShielding.Windows.exe`. No installation is required.
+For a portable copy, download `Sonic Shielding for Windows.exe`. No installation is required.
 
 Windows SmartScreen may warn about new unsigned applications. Public trust requires signing the installer and executable with an organization-validated or extended-validation Authenticode certificate. The release workflow supports a future signing step; do not bypass SmartScreen for a file obtained from anywhere other than this repository.
 

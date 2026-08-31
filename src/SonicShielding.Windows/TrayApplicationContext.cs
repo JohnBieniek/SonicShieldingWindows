@@ -19,13 +19,22 @@ internal sealed class TrayApplicationContext : ApplicationContext
         tray = new NotifyIcon
         {
             Visible = true,
-            Text = "Sonic Shielding",
+            Text = "Sonic Shielding for Windows",
             ContextMenuStrip = BuildMenu()
         };
         shield.StatusChanged += text => tray.Text = text.Length > 63 ? text[..63] : text;
         tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) Toggle(); };
         tray.DoubleClick += (_, _) => ShowSettings();
         ApplyState();
+        ShowStartupNotice();
+    }
+
+    private void ShowStartupNotice()
+    {
+        tray.BalloonTipTitle = "Sonic Shielding for Windows is ready";
+        tray.BalloonTipText = "Protection is running in the notification tray. Double-click the shield icon to open your Comfort Profile.";
+        tray.BalloonTipIcon = ToolTipIcon.Info;
+        tray.ShowBalloonTip(6000);
     }
 
     private ContextMenuStrip BuildMenu()

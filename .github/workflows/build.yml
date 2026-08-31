@@ -24,7 +24,7 @@ jobs:
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\SonicShielding.iss'
       - uses: actions/upload-artifact@v4
         with:
-          name: SonicShieldingWindows
+          name: Sonic-Shielding-for-Windows
           path: |
-            publish/SonicShielding.Windows.exe
+            publish/Sonic Shielding for Windows.exe
             artifacts/SonicShieldingWindows-Setup.exe
