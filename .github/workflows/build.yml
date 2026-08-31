@@ -1,0 +1,30 @@
+name: Build Windows release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet restore
+      - run: dotnet build -c Release --no-restore
+      - run: dotnet publish src/SonicShielding.Windows/SonicShielding.Windows.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=true -o publish
+      - name: Build installer
+        shell: powershell
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\SonicShielding.iss'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SonicShieldingWindows
+          path: |
+            publish/SonicShielding.Windows.exe
+            artifacts/SonicShieldingWindows-Setup.exe
