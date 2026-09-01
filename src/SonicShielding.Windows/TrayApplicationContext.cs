@@ -18,15 +18,15 @@ internal sealed class TrayApplicationContext : ApplicationContext
         shield = new(settings);
         tray = new NotifyIcon
         {
-            Visible = true,
+            Icon = settings.Enabled ? onIcon : offIcon,
             Text = "Sonic Shielding for Windows",
             ContextMenuStrip = BuildMenu()
         };
         shield.StatusChanged += text => tray.Text = text.Length > 63 ? text[..63] : text;
         tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) Toggle(); };
         tray.DoubleClick += (_, _) => ShowSettings();
-        ApplyState();
-        ShowStartupNotice();
+        tray.Visible = true;
+        if (ApplyState()) ShowStartupNotice();
     }
 
     private void ShowStartupNotice()
@@ -48,10 +48,30 @@ internal sealed class TrayApplicationContext : ApplicationContext
     }
 
     private void Toggle() { settings.Enabled = !settings.Enabled; settings.Save(); ApplyState(); window?.RefreshState(); }
-    private void ApplyState()
+    private bool ApplyState()
     {
         tray.Icon = settings.Enabled ? onIcon : offIcon;
-        if (settings.Enabled) shield.Start(); else shield.Stop();
+        if (!settings.Enabled)
+        {
+            shield.Stop();
+            return true;
+        }
+
+        try
+        {
+            shield.Start();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            shield.Stop();
+            tray.Text = "Sonic Shielding - audio protection unavailable";
+            tray.BalloonTipTitle = "Sonic Shielding could not start protection";
+            tray.BalloonTipText = $"The tray app is still running. Check your default audio output, then turn protection off and on.\n\n{ex.Message}";
+            tray.BalloonTipIcon = ToolTipIcon.Warning;
+            tray.ShowBalloonTip(8000);
+            return false;
+        }
     }
 
     private void ShowSettings()

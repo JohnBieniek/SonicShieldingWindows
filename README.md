@@ -11,7 +11,11 @@ Sonic Shielding sits in the Windows notification area and watches the complete a
 - Includes a seven-band comfort profile with a gentle tone-test button for every band.
 - Uses the original Sonic Shielding active and inactive icons and visual language.
 
-This safe user-mode build attenuates the complete mix while a detected sound is present. Selective frequency removal and always-on multiband EQ require a separately signed Windows Audio Processing Object (APO) driver. The app does not claim to provide those driver-only features.
+## Driver version
+
+The `driver-version` branch replaces master-volume attenuation with a native Windows Audio Processing Object (APO). Its real-time DSP processes 32-bit float PCM inside the Windows audio engine and applies frequency-selective cuts without changing endpoint volume. The native frequency-response test verifies that the default profile preserves low and speech-range content while strongly reducing the configured upper bands.
+
+The tray/controller can be shipped as a portable executable, but Windows must install and register the APO before system-wide filtering is possible. That installation boundary is required by the Windows audio engine and is what allows the filter to cover browsers, games, protected applications, and other processes without injecting code into them. Development builds require test signing; public builds require a Microsoft-accepted signed driver package.
 
 ## Install
 

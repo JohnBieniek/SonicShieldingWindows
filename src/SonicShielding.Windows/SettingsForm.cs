@@ -114,11 +114,11 @@ internal sealed class SettingsForm : Form
 
     private Control Footer()
     {
-        var footer = new TableLayoutPanel { ColumnCount = 1, RowCount = 3, Height = 190, Margin = new(4, 18, 4, 4) };
-        footer.RowStyles.Add(new(SizeType.Absolute, 34)); footer.RowStyles.Add(new(SizeType.Absolute, 30)); footer.RowStyles.Add(new(SizeType.Percent, 100));
+        var footer = new TableLayoutPanel { ColumnCount = 1, RowCount = 3, Height = 230, Margin = new(4, 18, 4, 4) };
+        footer.RowStyles.Add(new(SizeType.Absolute, 44)); footer.RowStyles.Add(new(SizeType.Absolute, 44)); footer.RowStyles.Add(new(SizeType.Percent, 100));
         var privacy = Label("Everything stays on your device.", 10, true, Color.FromArgb(167, 194, 209)); privacy.Dock = DockStyle.Fill; privacy.TextAlign = ContentAlignment.MiddleCenter;
         var partnership = Label("Created in partnership with", 9, false, Color.FromArgb(167, 194, 209)); partnership.Dock = DockStyle.Fill; partnership.TextAlign = ContentAlignment.MiddleCenter;
-        var logo = WhimsyLogo(); logo.Dock = DockStyle.Fill;
+        var logo = WhimsyLogo(); logo.Dock = DockStyle.Fill; logo.Margin = new(4, 8, 4, 8);
         footer.Controls.Add(privacy, 0, 0); footer.Controls.Add(partnership, 0, 1); footer.Controls.Add(logo, 0, 2);
         return footer;
     }

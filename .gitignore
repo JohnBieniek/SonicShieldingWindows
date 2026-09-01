@@ -5,3 +5,8 @@ artifacts/
 release/
 .vs/
 *.user
+*.obj
+*.lib
+*.exp
+native/**/*.dll
+native/**/*.exe

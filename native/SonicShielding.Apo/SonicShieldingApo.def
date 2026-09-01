@@ -1,0 +1,4 @@
+LIBRARY "SonicShieldingApo"
+EXPORTS
+    DllCanUnloadNow PRIVATE
+    DllGetClassObject PRIVATE
